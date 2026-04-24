@@ -6,14 +6,17 @@
 <title>Space Exploration</title>
 <style>
   body { margin: 0; overflow: hidden; background: #000; color: #fff; font-family: sans-serif; user-select: none; touch-action: none; }
-  canvas { display: block; }
+  canvas { display: block; touch-action: none; }
   #ui-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; display: flex; flex-direction: column; justify-content: space-between; }
+  #top-bar { display: flex; justify-content: space-between; align-items: flex-start; pointer-events: none; }
   #status-bar { padding: 10px; background: linear-gradient(rgba(0,0,0,0.8), transparent); pointer-events: auto; display: flex; gap: 20px; font-weight: bold; text-shadow: 1px 1px 2px #000; }
   .status-item { display: flex; flex-direction: column; font-size: 14px; }
   .bar-bg { width: 120px; height: 12px; background: rgba(255,255,255,0.2); margin-top: 5px; border-radius: 6px; overflow: hidden; box-shadow: inset 0 0 5px rgba(0,0,0,0.5); }
   .bar-fill { height: 100%; transition: width 0.1s; }
   #fuel-fill { background: #f90; width: 100%; }
   #energy-fill { background: #0cf; width: 100%; }
+  #camera-reset { pointer-events: auto; margin: 10px; padding: 10px 15px; background: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.4); border-radius: 20px; color: #fff; font-weight: bold; cursor: pointer; display: none; backdrop-filter: blur(5px); }
+  #camera-reset:active { background: rgba(255,255,255,0.4); }
   #bottom-controls { background: linear-gradient(transparent, rgba(0,0,0,0.9)); padding: 20px 10px; pointer-events: auto; display: flex; justify-content: space-between; align-items: flex-end; }
   .control-group { display: flex; gap: 10px; }
   .d-pad { display: grid; grid-template-columns: 50px 50px 50px; grid-template-rows: 50px 50px 50px; gap: 8px; }
@@ -26,6 +29,7 @@
   .action-btn { width: 60px; height: 60px; font-size: 16px; text-align: center; border-radius: 15px; flex-direction: column; line-height: 1.2; }
   .action-btn span { font-size: 10px; opacity: 0.8; }
   #messages { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); text-align: center; font-size: 20px; text-shadow: 0 0 10px #000; pointer-events: none; transition: opacity 0.5s; opacity: 0; }
+  #hint { position: absolute; top: 70px; left: 50%; transform: translateX(-50%); font-size: 14px; opacity: 0.7; pointer-events: none; text-shadow: 1px 1px 2px #000; }
 </style>
 </head>
 <body>
@@ -33,19 +37,23 @@
 <canvas id="gameCanvas"></canvas>
 
 <div id="ui-layer">
-  <div id="status-bar">
-    <div class="status-item">
-      <span>🚀 FUEL</span>
-      <div class="bar-bg"><div id="fuel-fill" class="bar-fill"></div></div>
+  <div id="top-bar">
+    <div id="status-bar">
+      <div class="status-item">
+        <span>🚀 FUEL</span>
+        <div class="bar-bg"><div id="fuel-fill" class="bar-fill"></div></div>
+      </div>
+      <div class="status-item">
+        <span>⚡ ENERGY</span>
+        <div class="bar-bg"><div id="energy-fill" class="bar-fill"></div></div>
+      </div>
+      <div class="status-item">
+        <span>🪨 ROCKS: <span id="rock-count">0</span></span>
+      </div>
     </div>
-    <div class="status-item">
-      <span>⚡ ENERGY</span>
-      <div class="bar-bg"><div id="energy-fill" class="bar-fill"></div></div>
-    </div>
-    <div class="status-item">
-      <span>🪨 ROCKS: <span id="rock-count">0</span></span>
-    </div>
+    <div id="camera-reset" onclick="resetCamera()">🎯 追従に戻す</div>
   </div>
+  <div id="hint">画面ドラッグでカメラ移動 / ピンチで拡大縮小</div>
   <div id="messages">Message</div>
   <div id="bottom-controls">
     <div class="control-group">
@@ -69,6 +77,7 @@
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
 const msgEl = document.getElementById('messages');
+const resetBtn = document.getElementById('camera-reset');
 let cw = canvas.width = window.innerWidth;
 let ch = canvas.height = window.innerHeight;
 
@@ -77,9 +86,11 @@ window.addEventListener('resize', () => {
   ch = canvas.height = window.innerHeight;
 });
 
-const input = { up:false, down:false, left:false, right:false, rotL:false, rotR:false, drill:false };
+setTimeout(() => { document.getElementById('hint').style.display = 'none'; }, 8000);
 
-// Better touch/mouse handling
+const input = { up:false, down:false, left:false, right:false, rotL:false, rotR:false, drill:false };
+const camera = { offsetX: 0, offsetY: 0, zoom: 1, isDetached: false };
+
 function setupButton(id, key) {
   const el = document.getElementById(id);
   const press = (e) => { e.preventDefault(); input[key] = true; el.classList.add('active'); };
@@ -116,6 +127,66 @@ window.addEventListener('keyup', e => {
   if(e.code==='KeyE') input.rotR=false;
   if(e.code==='Space') input.drill=false;
 });
+
+// Camera controls (Pan & Zoom)
+let pointers = [];
+let lastPanPoint = null;
+let lastPinchDist = null;
+
+canvas.addEventListener('pointerdown', e => {
+  pointers.push({ id: e.pointerId, x: e.clientX, y: e.clientY });
+  if (pointers.length === 1) {
+    lastPanPoint = { x: e.clientX, y: e.clientY };
+  } else if (pointers.length === 2) {
+    lastPinchDist = Math.hypot(pointers[0].x - pointers[1].x, pointers[0].y - pointers[1].y);
+  }
+});
+canvas.addEventListener('pointermove', e => {
+  const index = pointers.findIndex(p => p.id === e.pointerId);
+  if (index !== -1) pointers[index] = { id: e.pointerId, x: e.clientX, y: e.clientY };
+
+  if (pointers.length === 1 && lastPanPoint) {
+    const dx = e.clientX - lastPanPoint.x;
+    const dy = e.clientY - lastPanPoint.y;
+    if (Math.abs(dx) > 2 || Math.abs(dy) > 2) {
+      camera.isDetached = true;
+      resetBtn.style.display = 'block';
+    }
+    camera.offsetX -= dx / camera.zoom;
+    camera.offsetY -= dy / camera.zoom;
+    lastPanPoint = { x: e.clientX, y: e.clientY };
+  } else if (pointers.length === 2 && lastPinchDist) {
+    const dist = Math.hypot(pointers[0].x - pointers[1].x, pointers[0].y - pointers[1].y);
+    const zoomFactor = dist / lastPinchDist;
+    camera.zoom *= zoomFactor;
+    camera.zoom = Math.max(0.05, Math.min(camera.zoom, 5));
+    lastPinchDist = dist;
+  }
+});
+const handlePointerUp = e => {
+  pointers = pointers.filter(p => p.id !== e.pointerId);
+  if (pointers.length < 2) lastPinchDist = null;
+  if (pointers.length === 1) lastPanPoint = { x: pointers[0].x, y: pointers[0].y };
+  else lastPanPoint = null;
+};
+canvas.addEventListener('pointerup', handlePointerUp);
+canvas.addEventListener('pointercancel', handlePointerUp);
+canvas.addEventListener('pointerout', handlePointerUp);
+
+canvas.addEventListener('wheel', e => {
+  e.preventDefault();
+  const zoomFactor = e.deltaY > 0 ? 0.9 : 1.1;
+  camera.zoom *= zoomFactor;
+  camera.zoom = Math.max(0.05, Math.min(camera.zoom, 5));
+}, {passive: false});
+
+function resetCamera() {
+  camera.offsetX = 0;
+  camera.offsetY = 0;
+  camera.zoom = 1;
+  camera.isDetached = false;
+  resetBtn.style.display = 'none';
+}
 
 const ship = { x: 0, y: -2000, vx: 0, vy: 0, rotation: 0, vRot: 0, fuel: 100, energy: 100, rocks: 0, width: 24, height: 36 };
 const G = 0.5;
@@ -204,7 +275,10 @@ function update() {
     }
   }
 
-  generateChunksAround(ship.x, ship.y);
+  const cx = ship.x + camera.offsetX;
+  const cy = ship.y + camera.offsetY;
+  generateChunksAround(cx, cy);
+
   let nearPlanet = null; let minDist = Infinity;
 
   planets.forEach(p => {
@@ -218,7 +292,6 @@ function update() {
       const overlap = (p.r + ship.height/2) - dist;
       ship.x -= (dx/dist) * overlap; ship.y -= (dy/dist) * overlap;
       
-      // Calculate collision normal and bounce
       const nx = dx/dist; const ny = dy/dist;
       const dot = ship.vx * nx + ship.vy * ny;
       if (dot > 0) {
@@ -259,11 +332,18 @@ function update() {
 
 function drawStars(layer, parallax) {
   ctx.fillStyle = '#fff';
-  const offsetX = ship.x * parallax, offsetY = ship.y * parallax;
-  const startX = Math.floor((ship.x - cw/2 - offsetX) / 200) * 200;
-  const startY = Math.floor((ship.y - ch/2 - offsetY) / 200) * 200;
-  for(let x = startX; x < ship.x + cw/2 - offsetX + 200; x += 200) {
-    for(let y = startY; y < ship.y + ch/2 - offsetY + 200; y += 200) {
+  const cx = ship.x + camera.offsetX;
+  const cy = ship.y + camera.offsetY;
+  const vw = cw / camera.zoom;
+  const vh = ch / camera.zoom;
+
+  const offsetX = cx * parallax;
+  const offsetY = cy * parallax;
+  
+  const startX = Math.floor((cx - vw/2 - offsetX) / 200) * 200;
+  const startY = Math.floor((cy - vh/2 - offsetY) / 200) * 200;
+  for(let x = startX; x < cx + vw/2 - offsetX + 200; x += 200) {
+    for(let y = startY; y < cy + vh/2 - offsetY + 200; y += 200) {
       let hash = Math.sin(x * 12.9898 + y * 78.233 + layer * 133) * 43758.5453; hash = hash - Math.floor(hash);
       if(hash > 0.6) {
         ctx.globalAlpha = (hash - 0.6) * 2.5;
@@ -275,11 +355,21 @@ function drawStars(layer, parallax) {
 
 function draw() {
   ctx.fillStyle = '#020205'; ctx.fillRect(0, 0, cw, ch);
-  ctx.save(); ctx.translate(cw/2 - ship.x, ch/2 - ship.y);
+  ctx.save(); 
+  
+  const cx = ship.x + camera.offsetX;
+  const cy = ship.y + camera.offsetY;
+  const vw = cw / camera.zoom;
+  const vh = ch / camera.zoom;
+
+  ctx.translate(cw/2, ch/2);
+  ctx.scale(camera.zoom, camera.zoom);
+  ctx.translate(-cx, -cy);
+  
   drawStars(1, 0.9); drawStars(2, 0.6); drawStars(3, 0.3); ctx.globalAlpha = 1;
 
   planets.forEach(p => {
-    if(Math.abs(p.x - ship.x) < cw/2 + p.r + 100 && Math.abs(p.y - ship.y) < ch/2 + p.r + 100) {
+    if(Math.abs(p.x - cx) < vw/2 + p.r + 100 && Math.abs(p.y - cy) < vh/2 + p.r + 100) {
       if(p.type === 'planet') {
         const grad = ctx.createRadialGradient(p.x, p.y, p.r*0.8, p.x, p.y, p.r*1.2);
         grad.addColorStop(0, p.color); grad.addColorStop(1, 'rgba(0,0,0,0)');
@@ -298,6 +388,8 @@ function draw() {
   particles.forEach(p => { ctx.fillStyle = p.color; ctx.globalAlpha = p.life / p.maxLife; ctx.beginPath(); ctx.arc(p.x, p.y, 2, 0, Math.PI*2); ctx.fill(); });
   ctx.globalAlpha = 1;
 
+  // Draw ship
+  ctx.save();
   ctx.translate(ship.x, ship.y); ctx.rotate(ship.rotation);
 
   if(input.drill && ship.energy > 10) {
@@ -316,13 +408,65 @@ function draw() {
     if(input.rotR) drawFlame(-ship.width/2, -ship.height/2, 3);
   }
 
-  // Draw ship
   ctx.fillStyle = '#eee'; ctx.beginPath(); ctx.moveTo(0, -ship.height/2); ctx.lineTo(ship.width/2, ship.height/2); ctx.lineTo(-ship.width/2, ship.height/2); ctx.closePath(); ctx.fill();
-  // Solar panels
   ctx.fillStyle = '#0cf'; ctx.fillRect(-ship.width*1.2, -4, ship.width*2.4, 8);
-  // Cockpit
   ctx.fillStyle = '#0ff'; ctx.beginPath(); ctx.arc(0, -ship.height/4, 4, 0, Math.PI*2); ctx.fill();
-  ctx.restore();
+  ctx.restore(); // Restore ship transform
+
+  ctx.restore(); // Restore camera transform
+
+  // Draw indicators for off-screen planets
+  planets.forEach(p => {
+    const dx = p.x - cx;
+    const dy = p.y - cy;
+    const distSq = (p.x - ship.x)*(p.x - ship.x) + (p.y - ship.y)*(p.y - ship.y);
+    if (distSq > 15000*15000) return; // Ignore very far ones
+
+    if (Math.abs(dx) < vw/2 + p.r && Math.abs(dy) < vh/2 + p.r) return;
+
+    const angle = Math.atan2(dy, dx);
+    const dist = Math.sqrt(distSq);
+
+    const padding = 50; 
+    const xMax = cw/2 - padding;
+    const yMax = ch/2 - padding;
+    
+    let indX = 0, indY = 0;
+    const cosA = Math.cos(angle);
+    const sinA = Math.sin(angle);
+
+    if (Math.abs(cosA) * yMax > Math.abs(sinA) * xMax) {
+      indX = Math.sign(cosA) * xMax;
+      indY = indX * Math.tan(angle);
+    } else {
+      indY = Math.sign(sinA) * yMax;
+      indX = indY / Math.tan(angle);
+    }
+    
+    ctx.save();
+    ctx.setTransform(1, 0, 0, 1, cw/2, ch/2);
+    ctx.translate(indX, indY);
+    ctx.rotate(angle);
+    
+    ctx.fillStyle = p.color;
+    ctx.beginPath();
+    ctx.moveTo(12, 0);
+    ctx.lineTo(-10, 10);
+    ctx.lineTo(-10, -10);
+    ctx.fill();
+    
+    ctx.rotate(-angle);
+    ctx.fillStyle = 'rgba(255,255,255,0.9)';
+    ctx.font = '12px sans-serif';
+    ctx.textAlign = 'center';
+    let label = p.type === 'planet' ? 'Planet' : 'Asteroid';
+    
+    let tx = 0, ty = 25;
+    if (Math.abs(cosA) > 0.5) ty = 28; 
+    
+    ctx.fillText(`${label} ${Math.floor(dist)}m`, tx, ty);
+    ctx.restore();
+  });
 }
 
 requestAnimationFrame(update);
