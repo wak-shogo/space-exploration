@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Space Exploration</title>
+<style>
+  body { margin: 0; overflow: hidden; background: #000; color: #fff; font-family: sans-serif; user-select: none; touch-action: none; }
+  canvas { display: block; }
+  #ui-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; display: flex; flex-direction: column; justify-content: space-between; }
+  #status-bar { padding: 10px; background: linear-gradient(rgba(0,0,0,0.8), transparent); pointer-events: auto; display: flex; gap: 20px; font-weight: bold; text-shadow: 1px 1px 2px #000; }
+  .status-item { display: flex; flex-direction: column; font-size: 14px; }
+  .bar-bg { width: 120px; height: 12px; background: rgba(255,255,255,0.2); margin-top: 5px; border-radius: 6px; overflow: hidden; box-shadow: inset 0 0 5px rgba(0,0,0,0.5); }
+  .bar-fill { height: 100%; transition: width 0.1s; }
+  #fuel-fill { background: #f90; width: 100%; }
+  #energy-fill { background: #0cf; width: 100%; }
+  #bottom-controls { background: linear-gradient(transparent, rgba(0,0,0,0.9)); padding: 20px 10px; pointer-events: auto; display: flex; justify-content: space-between; align-items: flex-end; }
+  .control-group { display: flex; gap: 10px; }
+  .d-pad { display: grid; grid-template-columns: 50px 50px 50px; grid-template-rows: 50px 50px 50px; gap: 8px; }
+  .btn { background: rgba(255,255,255,0.1); border: 2px solid rgba(255,255,255,0.3); color: #fff; border-radius: 50%; display: flex; justify-content: center; align-items: center; font-size: 24px; cursor: pointer; touch-action: manipulation; backdrop-filter: blur(5px); }
+  .btn:active, .btn.active { background: rgba(255,255,255,0.4); border-color: #fff; }
+  .btn.up { grid-column: 2; grid-row: 1; border-radius: 10px; }
+  .btn.left { grid-column: 1; grid-row: 2; border-radius: 10px; }
+  .btn.right { grid-column: 3; grid-row: 2; border-radius: 10px; }
+  .btn.down { grid-column: 2; grid-row: 3; border-radius: 10px; }
+  .action-btn { width: 60px; height: 60px; font-size: 16px; text-align: center; border-radius: 15px; flex-direction: column; line-height: 1.2; }
+  .action-btn span { font-size: 10px; opacity: 0.8; }
+  #messages { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); text-align: center; font-size: 20px; text-shadow: 0 0 10px #000; pointer-events: none; transition: opacity 0.5s; opacity: 0; }
+</style>
+</head>
+<body>
+
+<canvas id="gameCanvas"></canvas>
+
+<div id="ui-layer">
+  <div id="status-bar">
+    <div class="status-item">
+      <span>🚀 FUEL</span>
+      <div class="bar-bg"><div id="fuel-fill" class="bar-fill"></div></div>
+    </div>
+    <div class="status-item">
+      <span>⚡ ENERGY</span>
+      <div class="bar-bg"><div id="energy-fill" class="bar-fill"></div></div>
+    </div>
+    <div class="status-item">
+      <span>🪨 ROCKS: <span id="rock-count">0</span></span>
+    </div>
+  </div>
+  <div id="messages">Message</div>
+  <div id="bottom-controls">
+    <div class="control-group">
+      <div class="btn action-btn" id="btn-rotl">↺<span>L-Rot</span></div>
+      <div class="btn action-btn" id="btn-rotr">↻<span>R-Rot</span></div>
+    </div>
+    <div class="d-pad">
+      <div class="btn up" id="btn-up">↑</div>
+      <div class="btn left" id="btn-left">←</div>
+      <div class="btn right" id="btn-right">→</div>
+      <div class="btn down" id="btn-down">↓</div>
+    </div>
+    <div class="control-group">
+      <div class="btn action-btn" id="btn-drill">⛏️<span>Drill</span></div>
+      <div class="btn action-btn" onclick="craftFuel()">⚙️<span>Craft</span></div>
+    </div>
+  </div>
+</div>
+
+<script>
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+const msgEl = document.getElementById('messages');
+let cw = canvas.width = window.innerWidth;
+let ch = canvas.height = window.innerHeight;
+
+window.addEventListener('resize', () => {
+  cw = canvas.width = window.innerWidth;
+  ch = canvas.height = window.innerHeight;
+});
+
+const input = { up:false, down:false, left:false, right:false, rotL:false, rotR:false, drill:false };
+
+// Better touch/mouse handling
+function setupButton(id, key) {
+  const el = document.getElementById(id);
+  const press = (e) => { e.preventDefault(); input[key] = true; el.classList.add('active'); };
+  const release = (e) => { e.preventDefault(); input[key] = false; el.classList.remove('active'); };
+  el.addEventListener('pointerdown', press);
+  el.addEventListener('pointerup', release);
+  el.addEventListener('pointerleave', release);
+}
+
+setupButton('btn-up', 'up');
+setupButton('btn-down', 'down');
+setupButton('btn-left', 'left');
+setupButton('btn-right', 'right');
+setupButton('btn-rotl', 'rotL');
+setupButton('btn-rotr', 'rotR');
+setupButton('btn-drill', 'drill');
+
+window.addEventListener('keydown', e => {
+  if(e.code==='KeyW'||e.code==='ArrowUp') input.up=true;
+  if(e.code==='KeyS'||e.code==='ArrowDown') input.down=true;
+  if(e.code==='KeyA'||e.code==='ArrowLeft') input.left=true;
+  if(e.code==='KeyD'||e.code==='ArrowRight') input.right=true;
+  if(e.code==='KeyQ') input.rotL=true;
+  if(e.code==='KeyE') input.rotR=true;
+  if(e.code==='Space') input.drill=true;
+  if(e.code==='KeyC') craftFuel();
+});
+window.addEventListener('keyup', e => {
+  if(e.code==='KeyW'||e.code==='ArrowUp') input.up=false;
+  if(e.code==='KeyS'||e.code==='ArrowDown') input.down=false;
+  if(e.code==='KeyA'||e.code==='ArrowLeft') input.left=false;
+  if(e.code==='KeyD'||e.code==='ArrowRight') input.right=false;
+  if(e.code==='KeyQ') input.rotL=false;
+  if(e.code==='KeyE') input.rotR=false;
+  if(e.code==='Space') input.drill=false;
+});
+
+const ship = { x: 0, y: -2000, vx: 0, vy: 0, rotation: 0, vRot: 0, fuel: 100, energy: 100, rocks: 0, width: 24, height: 36 };
+const G = 0.5;
+const planets = [];
+const generatedChunks = new Set();
+const CHUNK_SIZE = 3000;
+const particles = [];
+let lastTime = performance.now();
+
+// Initial huge planet
+planets.push({ x: 0, y: 0, r: 800, mass: 800*800*0.01, color: '#3a5a80', type: 'planet' });
+
+function showMessage(text) {
+  msgEl.innerText = text;
+  msgEl.style.opacity = 1;
+  setTimeout(() => msgEl.style.opacity = 0, 2000);
+}
+
+function generateChunksAround(x, y) {
+  const cx = Math.floor(x/CHUNK_SIZE);
+  const cy = Math.floor(y/CHUNK_SIZE);
+  for(let i = -1; i <= 1; i++) {
+    for(let j = -1; j <= 1; j++) {
+      const chunk = `${cx+i},${cy+j}`;
+      if(!generatedChunks.has(chunk)) {
+        generatedChunks.add(chunk);
+        let seed = (cx+i)*1337 + (cy+j)*9991;
+        const random = () => { seed = (seed * 9301 + 49297) % 233280; return seed / 233280; };
+        if(cx+i === 0 && cy+j === 0) continue; // Skip 0,0 to preserve initial planet
+        const count = Math.floor(random() * 3) + 1;
+        for(let k=0; k<count; k++) {
+          const type = random() > 0.7 ? 'planet' : 'asteroid';
+          const r = type === 'planet' ? 200 + random() * 400 : 40 + random() * 80;
+          planets.push({
+            x: (cx+i)*CHUNK_SIZE + random()*CHUNK_SIZE,
+            y: (cy+j)*CHUNK_SIZE + random()*CHUNK_SIZE, r: r,
+            mass: type === 'planet' ? r * r * 0.01 : r * r * 0.005,
+            color: type === 'planet' ? `hsl(${random()*360}, ${40+random()*30}%, ${30+random()*20}%)` : `#${Math.floor(5+random()*4)}${Math.floor(5+random()*4)}${Math.floor(5+random()*4)}`,
+            type: type
+          });
+        }
+      }
+    }
+  }
+}
+
+function craftFuel() {
+  if(ship.rocks >= 10 && ship.energy >= 20) {
+    if(ship.fuel >= 100) { showMessage("Fuel Full!"); return; }
+    ship.rocks -= 10; ship.energy -= 20;
+    ship.fuel = Math.min(100, ship.fuel + 25);
+    showMessage("Crafted Fuel! +25");
+  } else { showMessage("Need 10 Rocks & 20 Energy"); }
+}
+
+function addParticle(x, y, vx, vy, color, life) {
+  particles.push({x, y, vx, vy, color, life, maxLife: life});
+}
+
+function update() {
+  const now = performance.now();
+  const dt = Math.min((now - lastTime) / 1000, 0.1);
+  lastTime = now;
+
+  ship.energy = Math.min(100, ship.energy + 3 * dt); // Solar charge
+
+  if(input.rotL && ship.energy > 0) { ship.vRot -= 3 * dt; ship.energy -= 2 * dt; }
+  if(input.rotR && ship.energy > 0) { ship.vRot += 3 * dt; ship.energy -= 2 * dt; }
+  ship.vRot *= 0.96;
+  ship.rotation += ship.vRot * dt;
+
+  const cos = Math.cos(ship.rotation);
+  const sin = Math.sin(ship.rotation);
+  let thrustX = 0, thrustY = 0;
+  
+  if(ship.fuel > 0) {
+    let thrusting = false;
+    if(input.up) { thrustY -= 200; thrusting = true; }
+    if(input.down) { thrustY += 100; thrusting = true; }
+    if(input.left) { thrustX -= 100; thrusting = true; }
+    if(input.right) { thrustX += 100; thrusting = true; }
+    if(thrusting) {
+      ship.fuel -= 6 * dt;
+      ship.vx += (thrustX * cos - thrustY * sin) * dt;
+      ship.vy += (thrustX * sin + thrustY * cos) * dt;
+    }
+  }
+
+  generateChunksAround(ship.x, ship.y);
+  let nearPlanet = null; let minDist = Infinity;
+
+  planets.forEach(p => {
+    const dx = p.x - ship.x, dy = p.y - ship.y;
+    const distSq = dx*dx + dy*dy, dist = Math.sqrt(distSq);
+    if(dist < 4000 && dist > p.r) {
+      const force = (G * p.mass) / distSq;
+      ship.vx += (dx / dist) * force; ship.vy += (dy / dist) * force;
+    }
+    if(dist < p.r + ship.height/2) {
+      const overlap = (p.r + ship.height/2) - dist;
+      ship.x -= (dx/dist) * overlap; ship.y -= (dy/dist) * overlap;
+      
+      // Calculate collision normal and bounce
+      const nx = dx/dist; const ny = dy/dist;
+      const dot = ship.vx * nx + ship.vy * ny;
+      if (dot > 0) {
+        ship.vx -= 1.2 * dot * nx;
+        ship.vy -= 1.2 * dot * ny;
+      }
+      ship.vx *= 0.9; ship.vy *= 0.9; ship.vRot *= 0.9;
+    }
+    if(dist < minDist) { minDist = dist; nearPlanet = p; }
+  });
+
+  if(input.drill && ship.energy > 10 && nearPlanet && (minDist - nearPlanet.r) < 50) {
+    const angleToPlanet = Math.atan2(nearPlanet.y - ship.y, nearPlanet.x - ship.x);
+    const shipBottomAngle = ship.rotation + Math.PI/2;
+    let diff = Math.abs(angleToPlanet - shipBottomAngle) % (Math.PI*2);
+    if(diff > Math.PI) diff = Math.PI*2 - diff;
+    if(diff < Math.PI/3) {
+      ship.energy -= 15 * dt; ship.rocks += 8 * dt;
+      if(Math.random() > 0.5) {
+        addParticle(ship.x + Math.cos(shipBottomAngle) * ship.height/2, ship.y + Math.sin(shipBottomAngle) * ship.height/2, (Math.random()-0.5)*50, (Math.random()-0.5)*50, '#888', 0.5);
+      }
+    }
+  }
+
+  ship.x += ship.vx * dt; ship.y += ship.vy * dt;
+
+  for(let i = particles.length - 1; i >= 0; i--) {
+    particles[i].life -= dt; particles[i].x += particles[i].vx * dt; particles[i].y += particles[i].vy * dt;
+    if(particles[i].life <= 0) particles.splice(i, 1);
+  }
+
+  document.getElementById('fuel-fill').style.width = `${Math.max(0, ship.fuel)}%`;
+  document.getElementById('energy-fill').style.width = `${Math.max(0, ship.energy)}%`;
+  document.getElementById('rock-count').innerText = Math.floor(ship.rocks);
+
+  draw(); requestAnimationFrame(update);
+}
+
+function drawStars(layer, parallax) {
+  ctx.fillStyle = '#fff';
+  const offsetX = ship.x * parallax, offsetY = ship.y * parallax;
+  const startX = Math.floor((ship.x - cw/2 - offsetX) / 200) * 200;
+  const startY = Math.floor((ship.y - ch/2 - offsetY) / 200) * 200;
+  for(let x = startX; x < ship.x + cw/2 - offsetX + 200; x += 200) {
+    for(let y = startY; y < ship.y + ch/2 - offsetY + 200; y += 200) {
+      let hash = Math.sin(x * 12.9898 + y * 78.233 + layer * 133) * 43758.5453; hash = hash - Math.floor(hash);
+      if(hash > 0.6) {
+        ctx.globalAlpha = (hash - 0.6) * 2.5;
+        ctx.beginPath(); ctx.arc(x + offsetX + (hash*200), y + offsetY + ((hash*13)%1*200), hash*1.5, 0, Math.PI*2); ctx.fill();
+      }
+    }
+  }
+}
+
+function draw() {
+  ctx.fillStyle = '#020205'; ctx.fillRect(0, 0, cw, ch);
+  ctx.save(); ctx.translate(cw/2 - ship.x, ch/2 - ship.y);
+  drawStars(1, 0.9); drawStars(2, 0.6); drawStars(3, 0.3); ctx.globalAlpha = 1;
+
+  planets.forEach(p => {
+    if(Math.abs(p.x - ship.x) < cw/2 + p.r + 100 && Math.abs(p.y - ship.y) < ch/2 + p.r + 100) {
+      if(p.type === 'planet') {
+        const grad = ctx.createRadialGradient(p.x, p.y, p.r*0.8, p.x, p.y, p.r*1.2);
+        grad.addColorStop(0, p.color); grad.addColorStop(1, 'rgba(0,0,0,0)');
+        ctx.fillStyle = grad; ctx.beginPath(); ctx.arc(p.x, p.y, p.r*1.2, 0, Math.PI*2); ctx.fill();
+      }
+      ctx.fillStyle = p.color; ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, Math.PI*2); ctx.fill();
+      ctx.fillStyle = 'rgba(0,0,0,0.3)';
+      let seed = p.x * 123 + p.y * 456; const rand = () => { seed = (seed * 9301 + 49297) % 233280; return seed / 233280; };
+      for(let i=0; i<5; i++) {
+        const a = rand() * Math.PI * 2, d = rand() * p.r * 0.7, cr = p.r * (0.1 + rand()*0.15);
+        ctx.beginPath(); ctx.arc(p.x + Math.cos(a)*d, p.y + Math.sin(a)*d, cr, 0, Math.PI*2); ctx.fill();
+      }
+    }
+  });
+
+  particles.forEach(p => { ctx.fillStyle = p.color; ctx.globalAlpha = p.life / p.maxLife; ctx.beginPath(); ctx.arc(p.x, p.y, 2, 0, Math.PI*2); ctx.fill(); });
+  ctx.globalAlpha = 1;
+
+  ctx.translate(ship.x, ship.y); ctx.rotate(ship.rotation);
+
+  if(input.drill && ship.energy > 10) {
+    ctx.fillStyle = 'rgba(255, 50, 50, 0.6)'; ctx.beginPath();
+    ctx.moveTo(-4, ship.height/2); ctx.lineTo(4, ship.height/2); ctx.lineTo(0, ship.height/2 + 40 + Math.random()*20); ctx.fill();
+  }
+
+  if(ship.fuel > 0) {
+    ctx.fillStyle = '#f90';
+    const drawFlame = (x, y, size) => { ctx.beginPath(); ctx.arc(x, y, size + Math.random()*size, 0, Math.PI*2); ctx.fill(); };
+    if(input.up) drawFlame(0, ship.height/2 + 5, 6);
+    if(input.down) drawFlame(0, -ship.height/2 - 5, 4);
+    if(input.left) drawFlame(ship.width/2 + 5, 0, 4);
+    if(input.right) drawFlame(-ship.width/2 - 5, 0, 4);
+    if(input.rotL) drawFlame(ship.width/2, -ship.height/2, 3);
+    if(input.rotR) drawFlame(-ship.width/2, -ship.height/2, 3);
+  }
+
+  // Draw ship
+  ctx.fillStyle = '#eee'; ctx.beginPath(); ctx.moveTo(0, -ship.height/2); ctx.lineTo(ship.width/2, ship.height/2); ctx.lineTo(-ship.width/2, ship.height/2); ctx.closePath(); ctx.fill();
+  // Solar panels
+  ctx.fillStyle = '#0cf'; ctx.fillRect(-ship.width*1.2, -4, ship.width*2.4, 8);
+  // Cockpit
+  ctx.fillStyle = '#0ff'; ctx.beginPath(); ctx.arc(0, -ship.height/4, 4, 0, Math.PI*2); ctx.fill();
+  ctx.restore();
+}
+
+requestAnimationFrame(update);
+</script>
+</body>
+</html>
