@@ -26,6 +26,12 @@
   .d-pad { display: grid; grid-template-columns: 45px 45px 45px; grid-template-rows: 45px 45px 45px; gap: 5px; }
   .btn { background: rgba(255,255,255,0.1); border: 1px solid var(--hud); color: var(--hud); display: flex; justify-content: center; align-items: center; font-size: 14px; cursor: pointer; touch-action: manipulation; font-weight: bold; text-transform: uppercase; border-radius: 4px; }
   .btn:active, .btn.active { background: rgba(255, 255, 255, 0.4); }
+  .btn.up { grid-column: 2; grid-row: 1; }
+  .btn.left { grid-column: 1; grid-row: 2; }
+  .btn.right { grid-column: 3; grid-row: 2; }
+  .btn.down { grid-column: 2; grid-row: 3; }
+  .btn.rotl { grid-column: 1; grid-row: 1; font-size: 10px; }
+  .btn.rotr { grid-column: 3; grid-row: 1; font-size: 10px; }
   .action-btn { width: 45px; height: 45px; font-size: 10px; text-align: center; }
   #messages { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); text-align: center; font-size: 16px; pointer-events: none; transition: opacity 0.5s; opacity: 0; background: rgba(0, 0, 0, 0.9); border: 1px solid var(--hud); padding: 10px 20px; text-transform: uppercase; }
   #hint { position: absolute; top: 120px; left: 50%; transform: translateX(-50%); font-size: 10px; opacity: 0.8; pointer-events: none; background: rgba(0, 0, 0, 0.6); padding: 4px 8px; border: 1px dashed var(--hud); text-transform: uppercase; }
@@ -59,18 +65,19 @@
       <div id="camera-reset" onclick="resetCamera()">RESET CAM</div>
     </div>
     <div id="gravity-debug">
-      GRAVITY: <input type="range" id="gravity-slider" min="0" max="100" value="20" oninput="G = parseFloat(this.value); document.getElementById('g-val').innerText = G;"> <span id="g-val">20</span>
+      <div>GRAVITY: <input type="range" id="gravity-slider" min="0" max="100" value="20" oninput="G = parseFloat(this.value); document.getElementById('g-val').innerText = G;"> <span id="g-val">20</span></div>
+      <label style="cursor: pointer; display: flex; align-items: center; gap: 4px; margin-left: 10px;">
+        <input type="checkbox" id="vector-toggle" checked onchange="showVector = this.checked"> VECTOR
+      </label>
     </div>
   </div>
   <div id="hint">DRAG: PAN / PINCH: ZOOM</div>
   <div id="messages">Message</div>
   <div id="bottom-controls">
-    <div class="control-group">
-      <div class="btn action-btn" id="btn-rotl">L-ROT</div>
-      <div class="btn action-btn" id="btn-rotr">R-ROT</div>
-    </div>
     <div class="d-pad">
+      <div class="btn rotl" id="btn-rotl">L-ROT</div>
       <div class="btn up" id="btn-up">W</div>
+      <div class="btn rotr" id="btn-rotr">R-ROT</div>
       <div class="btn left" id="btn-left">A</div>
       <div class="btn right" id="btn-right">D</div>
       <div class="btn down" id="btn-down">S</div>
@@ -99,6 +106,7 @@ setTimeout(() => { document.getElementById('hint').style.display = 'none'; }, 80
 
 const input = { up:false, down:false, left:false, right:false, rotL:false, rotR:false, drill:false };
 const camera = { offsetX: 0, offsetY: 0, zoom: 0.8, isDetached: false };
+let showVector = true;
 
 function setupButton(id, key) {
   const el = document.getElementById(id);
@@ -236,7 +244,7 @@ function generateChunksAround(x, y) {
               const orbitRadius = starR + 1200 + p * 2500 + random() * 1500;
               const pR = 100 + random() * 250;
               const pMass = pR * pR * 0.8;
-              const orbitSpeed = (random() > 0.5 ? 1 : -1) * (150 / Math.sqrt(orbitRadius));
+              const orbitSpeed = (random() > 0.5 ? 1 : -1) * (2 * Math.PI / (300 + random() * 100));
               const orbitAngle = random() * Math.PI * 2;
               const pColor = `hsl(${random()*360}, ${40+random()*30}%, ${30+random()*20}%)`;
               const planet = { x: 0, y: 0, r: pR, mass: pMass, type: 'planet', orbitCenter: star, orbitRadius, orbitSpeed, orbitAngle, color: pColor };
@@ -247,7 +255,7 @@ function generateChunksAround(x, y) {
                  const mOrbitRadius = pR + 150 + m * 300 + random() * 150;
                  const mR = 30 + random() * 40;
                  const mMass = mR * mR * 0.5;
-                 const mOrbitSpeed = (random() > 0.5 ? 1 : -1) * (200 / Math.sqrt(mOrbitRadius));
+                 const mOrbitSpeed = (random() > 0.5 ? 1 : -1) * (2 * Math.PI / (60 + random() * 60));
                  const mOrbitAngle = random() * Math.PI * 2;
                  const mColor = `hsl(${random()*360}, ${10+random()*20}%, ${40+random()*20}%)`;
                  const moon = { x: 0, y: 0, r: mR, mass: mMass, type: 'moon', orbitCenter: planet, orbitRadius: mOrbitRadius, orbitSpeed: mOrbitSpeed, orbitAngle: mOrbitAngle, color: mColor };
@@ -485,7 +493,18 @@ function draw() {
   ctx.globalAlpha = 1;
 
   ctx.save();
-  ctx.translate(ship.x, ship.y); ctx.rotate(ship.rotation);
+  ctx.translate(ship.x, ship.y); 
+
+  if (showVector && (Math.abs(ship.vx) > 0.1 || Math.abs(ship.vy) > 0.1)) {
+    ctx.strokeStyle = 'rgba(0, 255, 0, 0.8)';
+    ctx.lineWidth = 2 / camera.zoom;
+    ctx.beginPath();
+    ctx.moveTo(0, 0);
+    ctx.lineTo(ship.vx, ship.vy);
+    ctx.stroke();
+  }
+
+  ctx.rotate(ship.rotation);
 
   if(input.drill && ship.energy > 10) {
     ctx.fillStyle = 'rgba(255, 50, 50, 0.6)'; ctx.beginPath();
