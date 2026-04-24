@@ -3,33 +3,32 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>Space Exploration</title>
+<title>Space Exploration HUD</title>
 <style>
-  body { margin: 0; overflow: hidden; background: #000; color: #fff; font-family: sans-serif; user-select: none; touch-action: none; }
+  :root { --hud: #0f0; --bg: #000800; }
+  body { margin: 0; overflow: hidden; background: var(--bg); color: var(--hud); font-family: "Courier New", Courier, monospace; user-select: none; touch-action: none; }
   canvas { display: block; touch-action: none; }
   #ui-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; display: flex; flex-direction: column; justify-content: space-between; }
   #top-bar { display: flex; justify-content: space-between; align-items: flex-start; pointer-events: none; }
-  #status-bar { padding: 10px; background: linear-gradient(rgba(0,0,0,0.8), transparent); pointer-events: auto; display: flex; gap: 20px; font-weight: bold; text-shadow: 1px 1px 2px #000; }
-  .status-item { display: flex; flex-direction: column; font-size: 14px; }
-  .bar-bg { width: 120px; height: 12px; background: rgba(255,255,255,0.2); margin-top: 5px; border-radius: 6px; overflow: hidden; box-shadow: inset 0 0 5px rgba(0,0,0,0.5); }
-  .bar-fill { height: 100%; transition: width 0.1s; }
-  #fuel-fill { background: #f90; width: 100%; }
-  #energy-fill { background: #0cf; width: 100%; }
-  #camera-reset { pointer-events: auto; margin: 10px; padding: 10px 15px; background: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.4); border-radius: 20px; color: #fff; font-weight: bold; cursor: pointer; display: none; backdrop-filter: blur(5px); }
-  #camera-reset:active { background: rgba(255,255,255,0.4); }
-  #bottom-controls { background: linear-gradient(transparent, rgba(0,0,0,0.9)); padding: 20px 10px; pointer-events: auto; display: flex; justify-content: space-between; align-items: flex-end; }
-  .control-group { display: flex; gap: 10px; }
-  .d-pad { display: grid; grid-template-columns: 50px 50px 50px; grid-template-rows: 50px 50px 50px; gap: 8px; }
-  .btn { background: rgba(255,255,255,0.1); border: 2px solid rgba(255,255,255,0.3); color: #fff; border-radius: 50%; display: flex; justify-content: center; align-items: center; font-size: 24px; cursor: pointer; touch-action: manipulation; backdrop-filter: blur(5px); }
-  .btn:active, .btn.active { background: rgba(255,255,255,0.4); border-color: #fff; }
-  .btn.up { grid-column: 2; grid-row: 1; border-radius: 10px; }
-  .btn.left { grid-column: 1; grid-row: 2; border-radius: 10px; }
-  .btn.right { grid-column: 3; grid-row: 2; border-radius: 10px; }
-  .btn.down { grid-column: 2; grid-row: 3; border-radius: 10px; }
-  .action-btn { width: 60px; height: 60px; font-size: 16px; text-align: center; border-radius: 15px; flex-direction: column; line-height: 1.2; }
-  .action-btn span { font-size: 10px; opacity: 0.8; }
-  #messages { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); text-align: center; font-size: 20px; text-shadow: 0 0 10px #000; pointer-events: none; transition: opacity 0.5s; opacity: 0; }
-  #hint { position: absolute; top: 70px; left: 50%; transform: translateX(-50%); font-size: 14px; opacity: 0.7; pointer-events: none; text-shadow: 1px 1px 2px #000; }
+  #status-bar { padding: 8px 12px; background: rgba(0, 10, 0, 0.85); pointer-events: auto; display: flex; flex-wrap: wrap; gap: 15px; font-weight: bold; border-bottom: 1px solid var(--hud); border-right: 1px solid var(--hud); text-transform: uppercase; }
+  .status-item { display: flex; flex-direction: column; font-size: 12px; }
+  .bar-bg { width: 100px; height: 8px; border: 1px solid var(--hud); margin-top: 4px; }
+  .bar-fill { height: 100%; transition: width 0.1s; background: var(--hud); }
+  #camera-reset { pointer-events: auto; margin: 10px; padding: 8px 12px; border: 1px solid var(--hud); background: rgba(0, 10, 0, 0.85); color: var(--hud); font-weight: bold; cursor: pointer; display: none; text-transform: uppercase; font-size: 12px; }
+  #camera-reset:active { background: var(--hud); color: #000; }
+  #bottom-controls { background: rgba(0, 10, 0, 0.85); padding: 10px; pointer-events: auto; display: flex; justify-content: space-between; align-items: flex-end; border-top: 1px solid var(--hud); box-sizing: border-box; width: 100%; }
+  .control-group { display: flex; gap: 5px; }
+  .d-pad { display: grid; grid-template-columns: 45px 45px 45px; grid-template-rows: 45px 45px 45px; gap: 5px; }
+  .btn { background: transparent; border: 1px solid var(--hud); color: var(--hud); display: flex; justify-content: center; align-items: center; font-size: 14px; cursor: pointer; touch-action: manipulation; font-weight: bold; text-transform: uppercase; }
+  .btn:active, .btn.active { background: rgba(0, 255, 0, 0.3); }
+  .action-btn { width: 45px; height: 45px; font-size: 10px; text-align: center; }
+  #messages { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); text-align: center; font-size: 16px; pointer-events: none; transition: opacity 0.5s; opacity: 0; background: rgba(0, 10, 0, 0.9); border: 1px solid var(--hud); padding: 10px 20px; text-transform: uppercase; }
+  #hint { position: absolute; top: 70px; left: 50%; transform: translateX(-50%); font-size: 10px; opacity: 0.8; pointer-events: none; background: rgba(0, 0, 0, 0.6); padding: 4px 8px; border: 1px dashed var(--hud); text-transform: uppercase; }
+  @media (max-width: 400px) {
+    .d-pad { grid-template-columns: 40px 40px 40px; grid-template-rows: 40px 40px 40px; }
+    .action-btn { width: 40px; height: 40px; font-size: 9px; }
+    .control-group { gap: 4px; }
+  }
 </style>
 </head>
 <body>
@@ -40,35 +39,35 @@
   <div id="top-bar">
     <div id="status-bar">
       <div class="status-item">
-        <span>🚀 FUEL</span>
+        <span>FUEL</span>
         <div class="bar-bg"><div id="fuel-fill" class="bar-fill"></div></div>
       </div>
       <div class="status-item">
-        <span>⚡ ENERGY</span>
+        <span>ENERGY</span>
         <div class="bar-bg"><div id="energy-fill" class="bar-fill"></div></div>
       </div>
       <div class="status-item">
-        <span>🪨 ROCKS: <span id="rock-count">0</span></span>
+        <span>ROCKS: <span id="rock-count">0</span></span>
       </div>
     </div>
-    <div id="camera-reset" onclick="resetCamera()">🎯 追従に戻す</div>
+    <div id="camera-reset" onclick="resetCamera()">RESET CAM</div>
   </div>
-  <div id="hint">画面ドラッグでカメラ移動 / ピンチで拡大縮小</div>
+  <div id="hint">DRAG: PAN / PINCH: ZOOM</div>
   <div id="messages">Message</div>
   <div id="bottom-controls">
     <div class="control-group">
-      <div class="btn action-btn" id="btn-rotl">↺<span>L-Rot</span></div>
-      <div class="btn action-btn" id="btn-rotr">↻<span>R-Rot</span></div>
+      <div class="btn action-btn" id="btn-rotl">L-ROT</div>
+      <div class="btn action-btn" id="btn-rotr">R-ROT</div>
     </div>
     <div class="d-pad">
-      <div class="btn up" id="btn-up">↑</div>
-      <div class="btn left" id="btn-left">←</div>
-      <div class="btn right" id="btn-right">→</div>
-      <div class="btn down" id="btn-down">↓</div>
+      <div class="btn up" id="btn-up">W</div>
+      <div class="btn left" id="btn-left">A</div>
+      <div class="btn right" id="btn-right">D</div>
+      <div class="btn down" id="btn-down">S</div>
     </div>
     <div class="control-group">
-      <div class="btn action-btn" id="btn-drill">⛏️<span>Drill</span></div>
-      <div class="btn action-btn" onclick="craftFuel()">⚙️<span>Craft</span></div>
+      <div class="btn action-btn" id="btn-drill">DRILL</div>
+      <div class="btn action-btn" onclick="craftFuel()">CRAFT</div>
     </div>
   </div>
 </div>
@@ -89,7 +88,7 @@ window.addEventListener('resize', () => {
 setTimeout(() => { document.getElementById('hint').style.display = 'none'; }, 8000);
 
 const input = { up:false, down:false, left:false, right:false, rotL:false, rotR:false, drill:false };
-const camera = { offsetX: 0, offsetY: 0, zoom: 1, isDetached: false };
+const camera = { offsetX: 0, offsetY: 0, zoom: 0.8, isDetached: false };
 
 function setupButton(id, key) {
   const el = document.getElementById(id);
@@ -159,7 +158,7 @@ canvas.addEventListener('pointermove', e => {
     const dist = Math.hypot(pointers[0].x - pointers[1].x, pointers[0].y - pointers[1].y);
     const zoomFactor = dist / lastPinchDist;
     camera.zoom *= zoomFactor;
-    camera.zoom = Math.max(0.05, Math.min(camera.zoom, 5));
+    camera.zoom = Math.max(0.02, Math.min(camera.zoom, 5));
     lastPinchDist = dist;
   }
 });
@@ -177,27 +176,24 @@ canvas.addEventListener('wheel', e => {
   e.preventDefault();
   const zoomFactor = e.deltaY > 0 ? 0.9 : 1.1;
   camera.zoom *= zoomFactor;
-  camera.zoom = Math.max(0.05, Math.min(camera.zoom, 5));
+  camera.zoom = Math.max(0.02, Math.min(camera.zoom, 5));
 }, {passive: false});
 
 function resetCamera() {
   camera.offsetX = 0;
   camera.offsetY = 0;
-  camera.zoom = 1;
+  camera.zoom = 0.8;
   camera.isDetached = false;
   resetBtn.style.display = 'none';
 }
 
 const ship = { x: 0, y: -2000, vx: 0, vy: 0, rotation: 0, vRot: 0, fuel: 100, energy: 100, rocks: 0, width: 24, height: 36 };
-const G = 0.5;
+const G = 50;
 const planets = [];
 const generatedChunks = new Set();
-const CHUNK_SIZE = 3000;
+const CHUNK_SIZE = 30000;
 const particles = [];
 let lastTime = performance.now();
-
-// Initial huge planet
-planets.push({ x: 0, y: 0, r: 800, mass: 800*800*0.01, color: '#3a5a80', type: 'planet' });
 
 function showMessage(text) {
   msgEl.innerText = text;
@@ -215,40 +211,72 @@ function generateChunksAround(x, y) {
         generatedChunks.add(chunk);
         let seed = (cx+i)*1337 + (cy+j)*9991;
         const random = () => { seed = (seed * 9301 + 49297) % 233280; return seed / 233280; };
-        if(cx+i === 0 && cy+j === 0) continue; // Skip 0,0 to preserve initial planet
-        const count = Math.floor(random() * 3) + 1;
-        for(let k=0; k<count; k++) {
-          const type = random() > 0.7 ? 'planet' : 'asteroid';
-          const r = type === 'planet' ? 200 + random() * 400 : 40 + random() * 80;
-          planets.push({
-            x: (cx+i)*CHUNK_SIZE + random()*CHUNK_SIZE,
-            y: (cy+j)*CHUNK_SIZE + random()*CHUNK_SIZE, r: r,
-            mass: type === 'planet' ? r * r * 0.01 : r * r * 0.005,
-            color: type === 'planet' ? `hsl(${random()*360}, ${40+random()*30}%, ${30+random()*20}%)` : `#${Math.floor(5+random()*4)}${Math.floor(5+random()*4)}${Math.floor(5+random()*4)}`,
-            type: type
-          });
+        
+        const startX = (cx+i)*CHUNK_SIZE + CHUNK_SIZE/2;
+        const startY = (cy+j)*CHUNK_SIZE + CHUNK_SIZE/2;
+        
+        // Guarantee star system at 0,0 and 50% chance elsewhere
+        if (random() > 0.5 || (cx+i === 0 && cy+j === 0)) {
+           const starR = 800 + random() * 800; 
+           const starMass = starR * starR * 1.5;
+           const star = { x: startX, y: startY, r: starR, mass: starMass, type: 'star' };
+           planets.push(star);
+           
+           const numPlanets = Math.floor(random() * 4) + 1; 
+           for(let p=0; p<numPlanets; p++) {
+              const orbitRadius = starR + 1200 + p * 2500 + random() * 1500;
+              const pR = 100 + random() * 250;
+              const pMass = pR * pR * 0.8;
+              const orbitSpeed = (random() > 0.5 ? 1 : -1) * (150 / Math.sqrt(orbitRadius));
+              const orbitAngle = random() * Math.PI * 2;
+              const planet = { x: 0, y: 0, r: pR, mass: pMass, type: 'planet', orbitCenter: star, orbitRadius, orbitSpeed, orbitAngle };
+              planets.push(planet);
+              
+              const numMoons = Math.floor(random() * 3);
+              for(let m=0; m<numMoons; m++) {
+                 const mOrbitRadius = pR + 150 + m * 300 + random() * 150;
+                 const mR = 30 + random() * 40;
+                 const mMass = mR * mR * 0.5;
+                 const mOrbitSpeed = (random() > 0.5 ? 1 : -1) * (200 / Math.sqrt(mOrbitRadius));
+                 const mOrbitAngle = random() * Math.PI * 2;
+                 const moon = { x: 0, y: 0, r: mR, mass: mMass, type: 'moon', orbitCenter: planet, orbitRadius: mOrbitRadius, orbitSpeed: mOrbitSpeed, orbitAngle: mOrbitAngle };
+                 planets.push(moon);
+              }
+           }
+        }
+        
+        const numAst = Math.floor(random() * 15);
+        for(let a=0; a<numAst; a++) {
+           const astX = startX + (random()-0.5) * CHUNK_SIZE;
+           const astY = startY + (random()-0.5) * CHUNK_SIZE;
+           const astR = 20 + random() * 50;
+           planets.push({ x: astX, y: astY, r: astR, mass: astR*astR*0.2, type: 'asteroid' });
         }
       }
     }
   }
 }
 
+// Generate starting chunk immediately so ship doesn't start in void
+generateChunksAround(0, 0);
+
 function craftFuel() {
   if(ship.rocks >= 10 && ship.energy >= 20) {
-    if(ship.fuel >= 100) { showMessage("Fuel Full!"); return; }
+    if(ship.fuel >= 100) { showMessage("FUEL FULL"); return; }
     ship.rocks -= 10; ship.energy -= 20;
     ship.fuel = Math.min(100, ship.fuel + 25);
-    showMessage("Crafted Fuel! +25");
-  } else { showMessage("Need 10 Rocks & 20 Energy"); }
+    showMessage("FUEL CRAFTED");
+  } else { showMessage("REQ: 10 ROCK, 20 EGY"); }
 }
 
-function addParticle(x, y, vx, vy, color, life) {
-  particles.push({x, y, vx, vy, color, life, maxLife: life});
+function addParticle(x, y, vx, vy, life) {
+  particles.push({x, y, vx, vy, life, maxLife: life});
 }
 
 function update() {
   const now = performance.now();
-  const dt = Math.min((now - lastTime) / 1000, 0.1);
+  let dt = (now - lastTime) / 1000;
+  if(dt > 0.1) dt = 0.1; // Cap dt
   lastTime = now;
 
   ship.energy = Math.min(100, ship.energy + 3 * dt); // Solar charge
@@ -264,16 +292,30 @@ function update() {
   
   if(ship.fuel > 0) {
     let thrusting = false;
-    if(input.up) { thrustY -= 200; thrusting = true; }
-    if(input.down) { thrustY += 100; thrusting = true; }
-    if(input.left) { thrustX -= 100; thrusting = true; }
-    if(input.right) { thrustX += 100; thrusting = true; }
+    if(input.up) { thrustY -= 300; thrusting = true; }
+    if(input.down) { thrustY += 150; thrusting = true; }
+    if(input.left) { thrustX -= 150; thrusting = true; }
+    if(input.right) { thrustX += 150; thrusting = true; }
     if(thrusting) {
       ship.fuel -= 6 * dt;
       ship.vx += (thrustX * cos - thrustY * sin) * dt;
       ship.vy += (thrustX * sin + thrustY * cos) * dt;
     }
   }
+
+  // Move Celestial Bodies
+  planets.forEach(p => {
+    p.px = p.x; p.py = p.y;
+    if (p.orbitCenter) {
+      p.orbitAngle += p.orbitSpeed * dt;
+      p.x = p.orbitCenter.x + Math.cos(p.orbitAngle) * p.orbitRadius;
+      p.y = p.orbitCenter.y + Math.sin(p.orbitAngle) * p.orbitRadius;
+      p.vx = (p.x - p.px) / dt;
+      p.vy = (p.y - p.py) / dt;
+    } else {
+      p.vx = 0; p.vy = 0;
+    }
+  });
 
   const cx = ship.x + camera.offsetX;
   const cy = ship.y + camera.offsetY;
@@ -283,23 +325,41 @@ function update() {
 
   planets.forEach(p => {
     const dx = p.x - ship.x, dy = p.y - ship.y;
-    const distSq = dx*dx + dy*dy, dist = Math.sqrt(distSq);
-    if(dist < 4000 && dist > p.r) {
+    const distSq = dx*dx + dy*dy;
+    const dist = Math.sqrt(distSq);
+    
+    // Apply Gravity if within noticeable range
+    if (dist < 30000 && dist > p.r) {
       const force = (G * p.mass) / distSq;
-      ship.vx += (dx / dist) * force; ship.vy += (dy / dist) * force;
+      if (force > 0.05) {
+        ship.vx += (dx / dist) * force * dt; 
+        ship.vy += (dy / dist) * force * dt;
+      }
     }
+
+    // Collision & Landing
     if(dist < p.r + ship.height/2) {
       const overlap = (p.r + ship.height/2) - dist;
-      ship.x -= (dx/dist) * overlap; ship.y -= (dy/dist) * overlap;
+      ship.x -= (dx/dist) * overlap; 
+      ship.y -= (dy/dist) * overlap;
       
       const nx = dx/dist; const ny = dy/dist;
-      const dot = ship.vx * nx + ship.vy * ny;
+      const rvx = ship.vx - p.vx;
+      const rvy = ship.vy - p.vy;
+      const dot = rvx * nx + rvy * ny;
+      
+      let nvx = rvx, nvy = rvy;
       if (dot > 0) {
-        ship.vx -= 1.2 * dot * nx;
-        ship.vy -= 1.2 * dot * ny;
+        nvx -= 1.5 * dot * nx; // Bounce
+        nvy -= 1.5 * dot * ny;
       }
-      ship.vx *= 0.9; ship.vy *= 0.9; ship.vRot *= 0.9;
+      nvx *= 0.9; nvy *= 0.9; // Surface friction
+      
+      ship.vx = nvx + p.vx;
+      ship.vy = nvy + p.vy;
+      ship.vRot *= 0.9;
     }
+    
     if(dist < minDist) { minDist = dist; nearPlanet = p; }
   });
 
@@ -311,7 +371,7 @@ function update() {
     if(diff < Math.PI/3) {
       ship.energy -= 15 * dt; ship.rocks += 8 * dt;
       if(Math.random() > 0.5) {
-        addParticle(ship.x + Math.cos(shipBottomAngle) * ship.height/2, ship.y + Math.sin(shipBottomAngle) * ship.height/2, (Math.random()-0.5)*50, (Math.random()-0.5)*50, '#888', 0.5);
+        addParticle(ship.x + Math.cos(shipBottomAngle) * ship.height/2, ship.y + Math.sin(shipBottomAngle) * ship.height/2, (Math.random()-0.5)*50 + (nearPlanet.vx||0), (Math.random()-0.5)*50 + (nearPlanet.vy||0), 0.5);
       }
     }
   }
@@ -331,7 +391,7 @@ function update() {
 }
 
 function drawStars(layer, parallax) {
-  ctx.fillStyle = '#fff';
+  ctx.fillStyle = 'rgba(0, 255, 0, 0.4)';
   const cx = ship.x + camera.offsetX;
   const cy = ship.y + camera.offsetY;
   const vw = cw / camera.zoom;
@@ -345,16 +405,16 @@ function drawStars(layer, parallax) {
   for(let x = startX; x < cx + vw/2 - offsetX + 200; x += 200) {
     for(let y = startY; y < cy + vh/2 - offsetY + 200; y += 200) {
       let hash = Math.sin(x * 12.9898 + y * 78.233 + layer * 133) * 43758.5453; hash = hash - Math.floor(hash);
-      if(hash > 0.6) {
-        ctx.globalAlpha = (hash - 0.6) * 2.5;
-        ctx.beginPath(); ctx.arc(x + offsetX + (hash*200), y + offsetY + ((hash*13)%1*200), hash*1.5, 0, Math.PI*2); ctx.fill();
+      if(hash > 0.8) {
+        ctx.globalAlpha = (hash - 0.8) * 5;
+        ctx.fillRect(x + offsetX, y + offsetY, 2, 2);
       }
     }
   }
 }
 
 function draw() {
-  ctx.fillStyle = '#020205'; ctx.fillRect(0, 0, cw, ch);
+  ctx.fillStyle = '#000800'; ctx.fillRect(0, 0, cw, ch);
   ctx.save(); 
   
   const cx = ship.x + camera.offsetX;
@@ -368,66 +428,97 @@ function draw() {
   
   drawStars(1, 0.9); drawStars(2, 0.6); drawStars(3, 0.3); ctx.globalAlpha = 1;
 
+  // Draw Orbits
+  ctx.strokeStyle = 'rgba(0, 255, 0, 0.15)';
+  ctx.lineWidth = 2;
+  planets.forEach(p => {
+    if (p.orbitCenter && Math.abs(p.orbitCenter.x - cx) < vw/2 + p.orbitRadius && Math.abs(p.orbitCenter.y - cy) < vh/2 + p.orbitRadius) {
+       ctx.beginPath(); ctx.arc(p.orbitCenter.x, p.orbitCenter.y, p.orbitRadius, 0, Math.PI*2); ctx.stroke();
+    }
+  });
+
+  // Draw Bodies
+  ctx.strokeStyle = '#0f0';
   planets.forEach(p => {
     if(Math.abs(p.x - cx) < vw/2 + p.r + 100 && Math.abs(p.y - cy) < vh/2 + p.r + 100) {
-      if(p.type === 'planet') {
-        const grad = ctx.createRadialGradient(p.x, p.y, p.r*0.8, p.x, p.y, p.r*1.2);
-        grad.addColorStop(0, p.color); grad.addColorStop(1, 'rgba(0,0,0,0)');
-        ctx.fillStyle = grad; ctx.beginPath(); ctx.arc(p.x, p.y, p.r*1.2, 0, Math.PI*2); ctx.fill();
-      }
-      ctx.fillStyle = p.color; ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, Math.PI*2); ctx.fill();
-      ctx.fillStyle = 'rgba(0,0,0,0.3)';
-      let seed = p.x * 123 + p.y * 456; const rand = () => { seed = (seed * 9301 + 49297) % 233280; return seed / 233280; };
-      for(let i=0; i<5; i++) {
-        const a = rand() * Math.PI * 2, d = rand() * p.r * 0.7, cr = p.r * (0.1 + rand()*0.15);
-        ctx.beginPath(); ctx.arc(p.x + Math.cos(a)*d, p.y + Math.sin(a)*d, cr, 0, Math.PI*2); ctx.fill();
+      ctx.lineWidth = p.type === 'star' ? 3 : 2;
+      
+      if (p.type === 'star') {
+        ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, Math.PI*2); ctx.stroke();
+        for(let i=0; i<16; i++) {
+           const a = (i/16)*Math.PI*2 + lastTime*0.001;
+           ctx.beginPath(); ctx.moveTo(p.x + Math.cos(a)*p.r, p.y + Math.sin(a)*p.r);
+           ctx.lineTo(p.x + Math.cos(a)*p.r*1.1, p.y + Math.sin(a)*p.r*1.1); ctx.stroke();
+        }
+      } else if (p.type === 'planet' || p.type === 'moon') {
+        ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, Math.PI*2); ctx.stroke();
+        ctx.beginPath(); ctx.ellipse(p.x, p.y, p.r, p.r*0.4, 0, 0, Math.PI*2); ctx.stroke();
+        ctx.beginPath(); ctx.ellipse(p.x, p.y, p.r*0.4, p.r, 0, 0, Math.PI*2); ctx.stroke();
+      } else {
+        ctx.beginPath(); 
+        let seed = p.x * 123 + p.y * 456; const rand = () => { seed = (seed * 9301 + 49297) % 233280; return seed / 233280; };
+        for(let i=0; i<8; i++) {
+           const a = (i/8)*Math.PI*2;
+           const r = p.r * (0.7 + rand()*0.3);
+           if(i===0) ctx.moveTo(p.x + Math.cos(a)*r, p.y + Math.sin(a)*r);
+           else ctx.lineTo(p.x + Math.cos(a)*r, p.y + Math.sin(a)*r);
+        }
+        ctx.closePath(); ctx.stroke();
       }
     }
   });
 
-  particles.forEach(p => { ctx.fillStyle = p.color; ctx.globalAlpha = p.life / p.maxLife; ctx.beginPath(); ctx.arc(p.x, p.y, 2, 0, Math.PI*2); ctx.fill(); });
+  // Particles
+  ctx.fillStyle = '#0f0';
+  particles.forEach(p => { ctx.globalAlpha = p.life / p.maxLife; ctx.fillRect(p.x-2, p.y-2, 4, 4); });
   ctx.globalAlpha = 1;
 
   // Draw ship
   ctx.save();
   ctx.translate(ship.x, ship.y); ctx.rotate(ship.rotation);
 
+  ctx.strokeStyle = '#0f0';
+  ctx.lineWidth = 2;
+
   if(input.drill && ship.energy > 10) {
-    ctx.fillStyle = 'rgba(255, 50, 50, 0.6)'; ctx.beginPath();
+    ctx.fillStyle = 'rgba(0, 255, 0, 0.4)'; ctx.beginPath();
     ctx.moveTo(-4, ship.height/2); ctx.lineTo(4, ship.height/2); ctx.lineTo(0, ship.height/2 + 40 + Math.random()*20); ctx.fill();
   }
 
   if(ship.fuel > 0) {
-    ctx.fillStyle = '#f90';
-    const drawFlame = (x, y, size) => { ctx.beginPath(); ctx.arc(x, y, size + Math.random()*size, 0, Math.PI*2); ctx.fill(); };
-    if(input.up) drawFlame(0, ship.height/2 + 5, 6);
-    if(input.down) drawFlame(0, -ship.height/2 - 5, 4);
-    if(input.left) drawFlame(ship.width/2 + 5, 0, 4);
-    if(input.right) drawFlame(-ship.width/2 - 5, 0, 4);
-    if(input.rotL) drawFlame(ship.width/2, -ship.height/2, 3);
-    if(input.rotR) drawFlame(-ship.width/2, -ship.height/2, 3);
+    ctx.fillStyle = '#0f0';
+    const drawFlame = (x, y, size) => { ctx.fillRect(x-size/2, y-size/2 + (Math.random()*size), size, size); };
+    if(input.up) drawFlame(0, ship.height/2 + 8, 8);
+    if(input.down) drawFlame(0, -ship.height/2 - 8, 6);
+    if(input.left) drawFlame(ship.width/2 + 8, 0, 6);
+    if(input.right) drawFlame(-ship.width/2 - 8, 0, 6);
+    if(input.rotL) drawFlame(ship.width/2, -ship.height/2, 4);
+    if(input.rotR) drawFlame(-ship.width/2, -ship.height/2, 4);
   }
 
-  ctx.fillStyle = '#eee'; ctx.beginPath(); ctx.moveTo(0, -ship.height/2); ctx.lineTo(ship.width/2, ship.height/2); ctx.lineTo(-ship.width/2, ship.height/2); ctx.closePath(); ctx.fill();
-  ctx.fillStyle = '#0cf'; ctx.fillRect(-ship.width*1.2, -4, ship.width*2.4, 8);
-  ctx.fillStyle = '#0ff'; ctx.beginPath(); ctx.arc(0, -ship.height/4, 4, 0, Math.PI*2); ctx.fill();
-  ctx.restore(); // Restore ship transform
+  ctx.beginPath(); ctx.moveTo(0, -ship.height/2); ctx.lineTo(ship.width/2, ship.height/2); ctx.lineTo(-ship.width/2, ship.height/2); ctx.closePath(); ctx.stroke();
+  ctx.strokeRect(-ship.width*1.2, -4, ship.width*2.4, 8);
+  ctx.fillStyle = '#000'; ctx.fillRect(-ship.width*1.2+1, -3, ship.width*2.4-2, 6);
+  ctx.beginPath(); ctx.arc(0, -ship.height/4, 4, 0, Math.PI*2); ctx.stroke();
+  ctx.restore();
 
   ctx.restore(); // Restore camera transform
 
-  // Draw indicators for off-screen planets
+  // Draw Indicators (HUD overlay)
   planets.forEach(p => {
     const dx = p.x - cx;
     const dy = p.y - cy;
-    const distSq = (p.x - ship.x)*(p.x - ship.x) + (p.y - ship.y)*(p.y - ship.y);
-    if (distSq > 15000*15000) return; // Ignore very far ones
+    const distSq = dx*dx + dy*dy;
+    const dist = Math.sqrt(distSq);
+
+    // Dynamic visibility range based on size and type
+    const showRange = p.type === 'star' ? p.r * 25 : (p.type === 'planet' ? p.r * 15 : p.r * 8);
+    if (dist > showRange) return;
 
     if (Math.abs(dx) < vw/2 + p.r && Math.abs(dy) < vh/2 + p.r) return;
 
     const angle = Math.atan2(dy, dx);
-    const dist = Math.sqrt(distSq);
-
-    const padding = 50; 
+    const padding = 40; 
     const xMax = cw/2 - padding;
     const yMax = ch/2 - padding;
     
@@ -448,23 +539,18 @@ function draw() {
     ctx.translate(indX, indY);
     ctx.rotate(angle);
     
-    ctx.fillStyle = p.color;
-    ctx.beginPath();
-    ctx.moveTo(12, 0);
-    ctx.lineTo(-10, 10);
-    ctx.lineTo(-10, -10);
-    ctx.fill();
+    ctx.fillStyle = 'rgba(0, 255, 0, 0.8)';
+    ctx.beginPath(); ctx.moveTo(12, 0); ctx.lineTo(-10, 8); ctx.lineTo(-10, -8); ctx.fill();
     
     ctx.rotate(-angle);
-    ctx.fillStyle = 'rgba(255,255,255,0.9)';
-    ctx.font = '12px sans-serif';
+    ctx.fillStyle = 'rgba(0, 255, 0, 1)';
+    ctx.font = 'bold 10px "Courier New", monospace';
     ctx.textAlign = 'center';
-    let label = p.type === 'planet' ? 'Planet' : 'Asteroid';
     
-    let tx = 0, ty = 25;
-    if (Math.abs(cosA) > 0.5) ty = 28; 
+    let tx = 0, ty = 22;
+    if (Math.abs(cosA) > 0.5) ty = 25; 
     
-    ctx.fillText(`${label} ${Math.floor(dist)}m`, tx, ty);
+    ctx.fillText(`${p.type.substring(0,3).toUpperCase()} ${Math.floor(dist)}M`, tx, ty);
     ctx.restore();
   });
 }
