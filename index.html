@@ -134,6 +134,11 @@
       <span class="cost">COST: 20 TITANIUM, 40 IRON</span>
       <button class="craft-btn" onclick="craft('solar')">UPGRADE</button>
     </div>
+    <div class="craft-item">
+      <span class="title" style="color:#f55;">EMERGENCY SELF DESTRUCT</span>
+      <span class="cost">COST: DESTROY CURRENT SHIP</span>
+      <button class="craft-btn" style="color:#f55; border-color:#f55;" onclick="die(); document.getElementById('craft-modal').style.display='none'">DESTRUCT</button>
+    </div>
     <button class="close-btn" onclick="document.getElementById('craft-modal').style.display='none'">CLOSE</button>
   </div>
 
@@ -459,6 +464,7 @@ function die() {
   ship.fuel = ship.maxFuel;
   ship.energy = ship.maxEnergy;
   ship.vx = 0; ship.vy = 0;
+  ship.landedOn = null;
   
   let p = planets.find(p => p.type === 'planet');
   if(p) {
@@ -479,6 +485,7 @@ function die() {
 
 function physicsStep(dt) {
   ship.energy = Math.min(ship.maxEnergy, ship.energy + 5 * ship.solarMod * dt);
+  ship.fuel = Math.min(ship.maxFuel, ship.fuel + 0.5 * dt); // slow passive fuel regen
 
   if(input.rotL && ship.energy > 0) { ship.vRot -= 3 * dt; ship.energy -= 2 * dt; }
   if(input.rotR && ship.energy > 0) { ship.vRot += 3 * dt; ship.energy -= 2 * dt; }
@@ -490,8 +497,8 @@ function physicsStep(dt) {
   let thrustX = 0, thrustY = 0;
   const baseThrust = 2000 * ship.thrustMod;
   
+  let thrusting = false;
   if(ship.fuel > 0) {
-    let thrusting = false;
     if(input.up) { thrustY -= baseThrust; thrusting = true; }
     if(input.down) { thrustY += baseThrust/2; thrusting = true; }
     if(input.left) { thrustX -= baseThrust/2; thrusting = true; }
@@ -500,6 +507,7 @@ function physicsStep(dt) {
       ship.fuel -= 15 * dt;
       ship.vx += (thrustX * cos - thrustY * sin) * dt;
       ship.vy += (thrustX * sin + thrustY * cos) * dt;
+      ship.landedOn = null;
     }
   }
 
@@ -581,6 +589,13 @@ function physicsStep(dt) {
       ship.vx = nvx + p.vx;
       ship.vy = nvy + p.vy;
       ship.vRot *= Math.pow(0.01, dt);
+
+      const speedSq = rvx*rvx + rvy*rvy;
+      if (speedSq < 20000 && !thrusting) {
+        ship.landedOn = p;
+        ship.landedAngle = Math.atan2(-dy, -dx);
+        ship.landedDist = actualR + ship.height/2;
+      }
     }
     
     if(dist < minDist) { minDist = dist; nearPlanet = p; }
@@ -619,7 +634,15 @@ function physicsStep(dt) {
     }
   }
 
-  ship.x += ship.vx * dt; ship.y += ship.vy * dt;
+  if (ship.landedOn) {
+    ship.x = ship.landedOn.x + Math.cos(ship.landedAngle) * ship.landedDist;
+    ship.y = ship.landedOn.y + Math.sin(ship.landedAngle) * ship.landedDist;
+    ship.vx = ship.landedOn.vx;
+    ship.vy = ship.landedOn.vy;
+  } else {
+    ship.x += ship.vx * dt; 
+    ship.y += ship.vy * dt;
+  }
 
   for(let i = particles.length - 1; i >= 0; i--) {
     particles[i].life -= dt; 
