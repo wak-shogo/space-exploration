@@ -342,7 +342,7 @@ function generateChunksAround(x, y) {
       const chunk = `${cx+i},${cy+j}`;
       if(!generatedChunks.has(chunk)) {
         generatedChunks.add(chunk);
-        let seed = (cx+i)*1337 + (cy+j)*9991;
+        let seed = ((cx+i)*13371337 ^ (cy+j)*99919991) >>> 0;
         const random = () => { seed = (seed * 9301 + 49297) % 233280; return seed / 233280; };
         
         const startX = (cx+i)*CHUNK_SIZE + CHUNK_SIZE/2;
@@ -399,6 +399,10 @@ generateChunksAround(0, 0);
 let initialPlanet = planets.find(p => p.type === 'planet');
 if (initialPlanet) {
   initialPlanet.orbitAngle += Math.random() * Math.PI * 2;
+  const orbitDirection = initialPlanet.orbitSpeed > 0 ? 1 : -1;
+  const v = Math.sqrt((G * initialPlanet.orbitCenter.mass) / initialPlanet.orbitRadius);
+  initialPlanet.orbitSpeed = orbitDirection * (v / initialPlanet.orbitRadius);
+
   initialPlanet.px = initialPlanet.x;
   initialPlanet.py = initialPlanet.y;
   initialPlanet.x = initialPlanet.orbitCenter.x + Math.cos(initialPlanet.orbitAngle) * initialPlanet.orbitRadius;
@@ -487,8 +491,8 @@ function physicsStep(dt) {
   ship.energy = Math.min(ship.maxEnergy, ship.energy + 5 * ship.solarMod * dt);
   ship.fuel = Math.min(ship.maxFuel, ship.fuel + 0.5 * dt); // slow passive fuel regen
 
-  if(input.rotL && ship.energy > 0) { ship.vRot -= 3 * dt; ship.energy -= 2 * dt; }
-  if(input.rotR && ship.energy > 0) { ship.vRot += 3 * dt; ship.energy -= 2 * dt; }
+  if(input.rotL && ship.energy > 0) { ship.vRot -= 3 * dt; ship.energy -= 2 * dt; ship.landedOn = null; }
+  if(input.rotR && ship.energy > 0) { ship.vRot += 3 * dt; ship.energy -= 2 * dt; ship.landedOn = null; }
   ship.vRot *= Math.pow(0.05, dt);
   ship.rotation += ship.vRot * dt;
 
@@ -514,6 +518,10 @@ function physicsStep(dt) {
   planets.forEach(p => {
     p.px = p.x; p.py = p.y;
     if (p.orbitCenter) {
+      const orbitDirection = p.orbitSpeed > 0 ? 1 : -1;
+      const v = Math.sqrt((G * p.orbitCenter.mass) / p.orbitRadius);
+      p.orbitSpeed = orbitDirection * (v / p.orbitRadius);
+      
       p.orbitAngle += p.orbitSpeed * dt;
       p.x = p.orbitCenter.x + Math.cos(p.orbitAngle) * p.orbitRadius;
       p.y = p.orbitCenter.y + Math.sin(p.orbitAngle) * p.orbitRadius;
@@ -523,6 +531,15 @@ function physicsStep(dt) {
       p.vx = 0; p.vy = 0;
     }
   });
+
+  if (ship.landedOn) {
+    ship.x = ship.landedOn.x + Math.cos(ship.landedAngle) * ship.landedDist;
+    ship.y = ship.landedOn.y + Math.sin(ship.landedAngle) * ship.landedDist;
+    ship.vx = ship.landedOn.vx;
+    ship.vy = ship.landedOn.vy;
+    ship.rotation = ship.landedAngle + Math.PI / 2;
+    ship.vRot = 0;
+  }
 
   const cx = ship.x + camera.offsetX;
   const cy = ship.y + camera.offsetY;
@@ -535,11 +552,19 @@ function physicsStep(dt) {
     const distSq = dx*dx + dy*dy;
     const dist = Math.sqrt(distSq);
     
-    // Gravity applies universally from stars, limited range from others
-    let forceRange = p.type === 'star' ? Infinity : p.r * 30;
+    if(dist < minDist) { minDist = dist; nearPlanet = p; }
+
+    if (ship.landedOn === p) return;
+
+    let forceRange;
+    if (p.type === 'star') forceRange = 4000000;
+    else if (p.type === 'planet') forceRange = 800000;
+    else if (p.type === 'moon') forceRange = 100000;
+    else forceRange = p.r * 10;
+
     if (dist < forceRange && dist > p.r) {
       const force = (G * p.mass) / distSq;
-      if (force > 0.01) {
+      if (force > 0.001) {
         ship.vx += (dx / dist) * force * dt; 
         ship.vy += (dy / dist) * force * dt;
       }
@@ -595,10 +620,10 @@ function physicsStep(dt) {
         ship.landedOn = p;
         ship.landedAngle = Math.atan2(-dy, -dx);
         ship.landedDist = actualR + ship.height/2;
+        ship.rotation = ship.landedAngle + Math.PI / 2;
+        ship.vRot = 0;
       }
     }
-    
-    if(dist < minDist) { minDist = dist; nearPlanet = p; }
   });
 
   if (ship.hp <= 0) {
@@ -634,12 +659,7 @@ function physicsStep(dt) {
     }
   }
 
-  if (ship.landedOn) {
-    ship.x = ship.landedOn.x + Math.cos(ship.landedAngle) * ship.landedDist;
-    ship.y = ship.landedOn.y + Math.sin(ship.landedAngle) * ship.landedDist;
-    ship.vx = ship.landedOn.vx;
-    ship.vy = ship.landedOn.vy;
-  } else {
+  if (!ship.landedOn) {
     ship.x += ship.vx * dt; 
     ship.y += ship.vy * dt;
   }
@@ -651,6 +671,7 @@ function physicsStep(dt) {
     if(particles[i].life <= 0) particles.splice(i, 1);
   }
 }
+
 
 function update() {
   const now = performance.now();
